@@ -29,6 +29,7 @@ export async function scanLiquidationOpportunities(
   config: Config
 ): Promise<MEVOpportunity[]> {
   const opportunities: MEVOpportunity[] = [];
+  // Keep the model explicit: bonus is capped and unwind cost is charged separately.
   const LIQUIDATION_BONUS_PCT = 0.05;
   const UNWIND_SLIPPAGE_PCT = 0.015;
 

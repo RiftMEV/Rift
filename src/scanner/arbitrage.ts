@@ -47,6 +47,7 @@ const SCAN_PAIRS: Array<{
   { tokenMint: "hntyVP6YFm1Hg25TN9WGLqM12b8TQmcknKrdu1oxWux", tokenName: "HNT", tokenDecimals: 8 },
 ];
 
+// Use one consistent USDC notional so scanner output is comparable across tokens.
 const TRADE_SIZE_USD = 10_000;
 
 function dominantVenue(quote: JupiterQuote): string {
