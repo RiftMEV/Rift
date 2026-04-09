@@ -17,7 +17,7 @@ Most people hear "MEV" and assume the game is already closed. Custom infra, priv
 
 That view misses a simpler layer of the market. Solana still produces short-lived spreads, liquidation-linked opportunities, and execution windows that are visible if someone is scanning the right sources with the right filters. Rift is built for that visible layer.
 
-It watches arbitrage and liquidation surfaces, estimates whether the math still survives after friction, and prints a ranked opportunity board that behaves more like an execution radar than a generic scanner.
+It watches route-dislocation and liquidation surfaces, estimates whether the math still survives after friction, and prints a ranked opportunity board that behaves more like an execution radar than a generic scanner.
 
 `SCAN -> FILTER -> PRICE EDGE -> DECIDE -> REPORT`
 
