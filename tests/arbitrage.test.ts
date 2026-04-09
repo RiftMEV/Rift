@@ -1,8 +1,8 @@
 import { describe, it, expect } from "vitest";
 import type { MEVOpportunity, ArbPath } from "../src/core/types.js";
 
-describe("MEVOpportunity types", () => {
-  it("constructs a valid route-dislocation opportunity", () => {
+describe("Rift opportunity models", () => {
+  it("builds a valid route-dislocation opportunity", () => {
     const path: ArbPath = {
       tokenIn: "USDC",
       tokenOut: "SOL",
@@ -36,7 +36,7 @@ describe("MEVOpportunity types", () => {
     expect(opp.path?.spreadPct).toBeGreaterThan(0);
   });
 
-  it("constructs a liquidation opportunity without a path", () => {
+  it("builds a liquidation opportunity without a path", () => {
     const opp: MEVOpportunity = {
       id: "liq-abc12345",
       type: "liquidation_arb",
