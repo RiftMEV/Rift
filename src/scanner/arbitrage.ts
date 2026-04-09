@@ -14,14 +14,14 @@ interface JupiterQuote {
 async function getQuote(
   inputMint: string,
   outputMint: string,
-  amountLamports: number
+  amountAtomic: number
 ): Promise<JupiterQuote | null> {
   try {
     const url =
       `https://quote-api.jup.ag/v6/quote` +
       `?inputMint=${inputMint}` +
       `&outputMint=${outputMint}` +
-      `&amount=${amountLamports}` +
+      `&amount=${amountAtomic}` +
       `&slippageBps=50`;
 
     const res = await fetch(url);
@@ -34,98 +34,117 @@ async function getQuote(
 
 const SOL_MINT = "So11111111111111111111111111111111111111112";
 const USDC_MINT = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
+const USDC_DECIMALS = 1_000_000;
 
-const SCAN_PAIRS: Array<{ tokenA: string; tokenB: string; nameA: string; nameB: string }> = [
-  { tokenA: SOL_MINT, tokenB: USDC_MINT, nameA: "SOL", nameB: "USDC" },
-  {
-    tokenA: "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN",
-    tokenB: USDC_MINT,
-    nameA: "JUP",
-    nameB: "USDC",
-  },
-  {
-    tokenA: "jtojtomepa8beP8AuQc6eXt5FriJwfFMwQx2v2f9mCL",
-    tokenB: USDC_MINT,
-    nameA: "JTO",
-    nameB: "USDC",
-  },
-  {
-    tokenA: "hntyVP6YFm1Hg25TN9WGLqM12b8TQmcknKrdu1oxWux",
-    tokenB: USDC_MINT,
-    nameA: "HNT",
-    nameB: "USDC",
-  },
+const SCAN_PAIRS: Array<{
+  tokenMint: string;
+  tokenName: string;
+  tokenDecimals: number;
+}> = [
+  { tokenMint: SOL_MINT, tokenName: "SOL", tokenDecimals: 9 },
+  { tokenMint: "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN", tokenName: "JUP", tokenDecimals: 6 },
+  { tokenMint: "jtojtomepa8beP8AuQc6eXt5FriJwfFMwQx2v2f9mCL", tokenName: "JTO", tokenDecimals: 9 },
+  { tokenMint: "hntyVP6YFm1Hg25TN9WGLqM12b8TQmcknKrdu1oxWux", tokenName: "HNT", tokenDecimals: 8 },
 ];
 
 const TRADE_SIZE_USD = 10_000;
+
+function dominantVenue(quote: JupiterQuote): string {
+  return quote.routePlan[0]?.swapInfo?.label ?? "Unknown route";
+}
+
+function classifyVerdict(
+  config: Config,
+  netProfitUsd: number,
+  confidence: number
+): MEVOpportunity["verdict"] {
+  if (netProfitUsd >= config.MIN_PROFIT_USD * 2 && confidence >= 0.8) {
+    return "act";
+  }
+  if (netProfitUsd >= config.MIN_PROFIT_USD && confidence >= config.MIN_CONFIDENCE) {
+    return "watch";
+  }
+  return "skip";
+}
 
 export async function scanArbitrageOpportunities(
   config: Config
 ): Promise<MEVOpportunity[]> {
   const opportunities: MEVOpportunity[] = [];
+  const usdcInput = TRADE_SIZE_USD * USDC_DECIMALS;
 
   for (const pair of SCAN_PAIRS) {
     try {
-      const lamports = TRADE_SIZE_USD * 1_000_000;
+      const entryQuote = await getQuote(USDC_MINT, pair.tokenMint, usdcInput);
+      if (!entryQuote) continue;
 
-      const [forwardQuote, reverseQuote] = await Promise.all([
-        getQuote(pair.tokenA, pair.tokenB, lamports),
-        getQuote(pair.tokenB, pair.tokenA, lamports),
-      ]);
+      const reverseInput = Number(entryQuote.outAmount);
+      if (!Number.isFinite(reverseInput) || reverseInput <= 0) continue;
 
-      if (!forwardQuote || !reverseQuote) continue;
+      const exitQuote = await getQuote(pair.tokenMint, USDC_MINT, reverseInput);
+      if (!exitQuote) continue;
 
-      const priceA =
-        parseFloat(forwardQuote.outAmount) / parseFloat(forwardQuote.inAmount);
-      const priceB =
-        parseFloat(reverseQuote.outAmount) / parseFloat(reverseQuote.inAmount);
+      const tokenAmount = Number(entryQuote.outAmount) / 10 ** pair.tokenDecimals;
+      const returnedUsdc = Number(exitQuote.outAmount) / USDC_DECIMALS;
+      if (!Number.isFinite(tokenAmount) || !Number.isFinite(returnedUsdc) || tokenAmount <= 0) {
+        continue;
+      }
 
-      const spread = Math.abs(priceA - priceB);
-      const spreadPct = (spread / Math.min(priceA, priceB)) * 100;
+      const entryPriceUsd = TRADE_SIZE_USD / tokenAmount;
+      const exitPriceUsd = returnedUsdc / tokenAmount;
+      const grossEdgeUsd = returnedUsdc - TRADE_SIZE_USD;
+      const spreadPct = (grossEdgeUsd / TRADE_SIZE_USD) * 100;
 
-      if (spreadPct < 0.3) continue;
-
-      const estimatedProfitUsd = (spreadPct / 100) * TRADE_SIZE_USD;
-      const gasEstimateUsd = 0.05;
+      const routeImpactPct =
+        parseFloat(entryQuote.priceImpactPct || "0") +
+        parseFloat(exitQuote.priceImpactPct || "0");
+      const gasEstimateUsd = 0.05 + TRADE_SIZE_USD * (routeImpactPct / 100);
+      const estimatedProfitUsd = grossEdgeUsd;
       const netProfitUsd = estimatedProfitUsd - gasEstimateUsd;
 
       if (netProfitUsd < config.MIN_PROFIT_USD) continue;
 
-      const dexA =
-        forwardQuote.routePlan[0]?.swapInfo?.label ?? "Unknown DEX";
-      const dexB =
-        reverseQuote.routePlan[0]?.swapInfo?.label ?? "Unknown DEX";
+      const entryVenue = dominantVenue(entryQuote);
+      const exitVenue = dominantVenue(exitQuote);
+      const confidence = Math.max(
+        0.2,
+        Math.min(0.95, Math.abs(spreadPct) * 1.5 - routeImpactPct)
+      );
+      const verdict = classifyVerdict(config, netProfitUsd, confidence);
 
       const path: ArbPath = {
-        tokenIn: pair.nameA,
-        tokenOut: pair.nameB,
-        mintIn: pair.tokenA,
-        mintOut: pair.tokenB,
-        dexA,
-        dexB,
-        priceA,
-        priceB,
+        tokenIn: "USDC",
+        tokenOut: pair.tokenName,
+        mintIn: USDC_MINT,
+        mintOut: pair.tokenMint,
+        dexA: entryVenue,
+        dexB: exitVenue,
+        priceA: entryPriceUsd,
+        priceB: exitPriceUsd,
         spreadPct,
         estimatedProfitUsd,
       };
 
       const opp: MEVOpportunity = {
-        id: `arb-${pair.nameA}-${pair.nameB}-${Date.now()}`,
+        id: `route-${pair.tokenName}-${entryVenue.replace(/\s+/g, "-").toLowerCase()}-${exitVenue.replace(/\s+/g, "-").toLowerCase()}`,
         type: "arbitrage",
+        verdict,
         path,
         estimatedProfitUsd,
         gasEstimateUsd,
         netProfitUsd,
-        confidence: Math.min(0.95, spreadPct / 2),
+        confidence,
         timeWindowMs: 2000,
-        rationale: `${pair.nameA}/${pair.nameB} spread of ${spreadPct.toFixed(2)}% between ${dexA} and ${dexB}. Estimated net profit: $${netProfitUsd.toFixed(2)} on $${TRADE_SIZE_USD} trade.`,
+        rationale: `${pair.tokenName} round-trip via Jupiter returned $${returnedUsdc.toFixed(2)} from a $${TRADE_SIZE_USD} USDC route. Entry venue ${entryVenue}, unwind venue ${exitVenue}, route impact ${routeImpactPct.toFixed(2)}%.`,
         detectedAt: Date.now(),
       };
 
       opportunities.push(opp);
-      logger.info(`Arb found: ${pair.nameA}/${pair.nameB} spread=${spreadPct.toFixed(2)}% profit=$${netProfitUsd.toFixed(2)}`);
+      logger.info(
+        `Route dislocation: ${pair.tokenName}/USDC net=$${netProfitUsd.toFixed(2)} verdict=${verdict}`
+      );
     } catch (err) {
-      logger.debug(`Error scanning ${pair.nameA}/${pair.nameB}:`, err);
+      logger.debug(`Error scanning ${pair.tokenName}/USDC:`, err);
     }
   }
 

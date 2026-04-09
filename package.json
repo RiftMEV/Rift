@@ -2,6 +2,15 @@
   "name": "rift",
   "version": "1.0.0",
   "description": "On-chain MEV opportunity scanner for Solana.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/RiftMEV/Rift.git"
+  },
+  "bugs": {
+    "url": "https://github.com/RiftMEV/Rift/issues"
+  },
+  "homepage": "https://github.com/RiftMEV/Rift#readme",
   "type": "module",
   "main": "dist/index.js",
   "scripts": {

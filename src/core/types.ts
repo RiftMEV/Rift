@@ -1,4 +1,5 @@
 export type OpportunityType = "arbitrage" | "liquidation_arb" | "jit_liquidity" | "sandwich_defense";
+export type OpportunityVerdict = "act" | "watch" | "skip";
 
 export interface ArbPath {
   tokenIn: string;
@@ -16,6 +17,7 @@ export interface ArbPath {
 export interface MEVOpportunity {
   id: string;
   type: OpportunityType;
+  verdict: OpportunityVerdict;
   path?: ArbPath;
   estimatedProfitUsd: number;
   gasEstimateUsd: number;

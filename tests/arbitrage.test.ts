@@ -2,48 +2,51 @@ import { describe, it, expect } from "vitest";
 import type { MEVOpportunity, ArbPath } from "../src/core/types.js";
 
 describe("MEVOpportunity types", () => {
-  it("constructs a valid arbitrage opportunity", () => {
+  it("constructs a valid route-dislocation opportunity", () => {
     const path: ArbPath = {
-      tokenIn: "SOL",
-      tokenOut: "USDC",
-      mintIn: "So11111111111111111111111111111111111111112",
-      mintOut: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+      tokenIn: "USDC",
+      tokenOut: "SOL",
+      mintIn: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+      mintOut: "So11111111111111111111111111111111111111112",
       dexA: "Orca",
       dexB: "Raydium",
-      priceA: 0.00513,
-      priceB: 0.00519,
-      spreadPct: 1.17,
-      estimatedProfitUsd: 117,
+      priceA: 191.2,
+      priceB: 193.1,
+      spreadPct: 0.99,
+      estimatedProfitUsd: 99,
     };
 
     const opp: MEVOpportunity = {
-      id: "arb-SOL-USDC-1234567890",
+      id: "route-SOL-orca-raydium",
       type: "arbitrage",
+      verdict: "watch",
       path,
-      estimatedProfitUsd: 117,
-      gasEstimateUsd: 0.05,
-      netProfitUsd: 116.95,
+      estimatedProfitUsd: 99,
+      gasEstimateUsd: 12.5,
+      netProfitUsd: 86.5,
       confidence: 0.82,
       timeWindowMs: 2000,
-      rationale: "SOL/USDC 1.17% spread between Orca and Raydium",
+      rationale: "SOL round-trip via Jupiter returned more USDC than it started with.",
       detectedAt: Date.now(),
     };
 
     expect(opp.type).toBe("arbitrage");
-    expect(opp.netProfitUsd).toBeCloseTo(116.95);
+    expect(opp.verdict).toBe("watch");
+    expect(opp.netProfitUsd).toBeCloseTo(86.5);
     expect(opp.path?.spreadPct).toBeGreaterThan(0);
   });
 
   it("constructs a liquidation opportunity without a path", () => {
     const opp: MEVOpportunity = {
-      id: "liq-abc12345-1234567890",
+      id: "liq-abc12345",
       type: "liquidation_arb",
+      verdict: "act",
       estimatedProfitUsd: 320,
-      gasEstimateUsd: 0.1,
-      netProfitUsd: 319.9,
+      gasEstimateUsd: 75.1,
+      netProfitUsd: 244.9,
       confidence: 0.9,
       timeWindowMs: 5000,
-      rationale: "Account health factor 0.97 — near liquidation",
+      rationale: "Account health factor 0.97 with modeled liquidation bonus.",
       detectedAt: Date.now(),
     };
 
@@ -53,13 +56,14 @@ describe("MEVOpportunity types", () => {
   });
 
   it("net profit is estimated minus gas", () => {
-    const gas = 0.05;
+    const gas = 12.25;
     const gross = 150;
     const net = gross - gas;
 
     const opp: MEVOpportunity = {
       id: "arb-test",
       type: "arbitrage",
+      verdict: "skip",
       estimatedProfitUsd: gross,
       gasEstimateUsd: gas,
       netProfitUsd: net,

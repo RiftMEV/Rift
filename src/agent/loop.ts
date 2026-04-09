@@ -6,10 +6,22 @@ import { scanArbitrageOpportunities } from "../scanner/arbitrage.js";
 import { scanLiquidationOpportunities } from "../scanner/liquidation.js";
 import { logger } from "../core/logger.js";
 
+function mergeUniqueOpportunities(
+  existing: MEVOpportunity[],
+  incoming: MEVOpportunity[]
+): void {
+  const seen = new Set(existing.map((opp) => opp.id));
+  for (const opp of incoming) {
+    if (seen.has(opp.id)) continue;
+    existing.push(opp);
+    seen.add(opp.id);
+  }
+}
+
 const TOOLS: Anthropic.Tool[] = [
   {
     name: "scan_arbitrage",
-    description: "Scan Jupiter for cross-DEX arbitrage opportunities on Solana.",
+    description: "Scan Jupiter for route dislocations on Solana using a USDC round-trip.",
     input_schema: { type: "object" as const, properties: {}, required: [] },
   },
   {
@@ -36,19 +48,13 @@ const TOOLS: Anthropic.Tool[] = [
   },
 ];
 
-export async function runAgentLoop(config: Config): Promise<void> {
+export async function runAgentLoop(
+  config: Config,
+  seedOpportunities: MEVOpportunity[]
+): Promise<void> {
   const client = new Anthropic({ apiKey: config.ANTHROPIC_API_KEY });
-
-  logger.info("Starting Rift agent scan...");
-  const start = Date.now();
-
-  const [arbOpps, liqOpps] = await Promise.all([
-    scanArbitrageOpportunities(config),
-    scanLiquidationOpportunities(config),
-  ]);
-
-  const allOpportunities = [...arbOpps, ...liqOpps];
-  logger.info(`Initial scan: ${allOpportunities.length} opportunities in ${Date.now() - start}ms`);
+  const allOpportunities = [...seedOpportunities];
+  logger.info(`Starting Rift agent review for ${allOpportunities.length} seeded opportunities...`);
 
   const messages: Anthropic.MessageParam[] = [
     { role: "user", content: buildUserPrompt(allOpportunities) },
@@ -74,7 +80,7 @@ export async function runAgentLoop(config: Config): Promise<void> {
     if (response.stop_reason === "end_turn") {
       const textBlocks = response.content.filter((b): b is Anthropic.TextBlock => b.type === "text");
       for (const block of textBlocks) {
-        console.log("\n" + block.text);
+        console.log(`\n${block.text}`);
       }
       break;
     }
@@ -90,11 +96,11 @@ export async function runAgentLoop(config: Config): Promise<void> {
 
       if (block.name === "scan_arbitrage") {
         const opps = await scanArbitrageOpportunities(config);
-        allOpportunities.push(...opps);
+        mergeUniqueOpportunities(allOpportunities, opps);
         result = JSON.stringify({ found: opps.length, opportunities: opps });
       } else if (block.name === "scan_liquidations") {
         const opps = await scanLiquidationOpportunities(config);
-        allOpportunities.push(...opps);
+        mergeUniqueOpportunities(allOpportunities, opps);
         result = JSON.stringify({ found: opps.length, opportunities: opps });
       } else if (block.name === "rank_opportunities") {
         const input = block.input as { min_confidence?: number; min_profit_usd?: number };
@@ -105,6 +111,7 @@ export async function runAgentLoop(config: Config): Promise<void> {
           .sort((a, b) => b.netProfitUsd - a.netProfitUsd);
         result = JSON.stringify(ranked);
       } else if (block.name === "format_report") {
+        const ranked = [...allOpportunities].sort((a, b) => b.netProfitUsd - a.netProfitUsd);
         const report = {
           timestamp: new Date().toISOString(),
           totalOpportunities: allOpportunities.length,
@@ -112,9 +119,12 @@ export async function runAgentLoop(config: Config): Promise<void> {
             arbitrage: allOpportunities.filter((o) => o.type === "arbitrage").length,
             liquidation_arb: allOpportunities.filter((o) => o.type === "liquidation_arb").length,
           },
-          topOpportunities: allOpportunities
-            .sort((a, b) => b.netProfitUsd - a.netProfitUsd)
-            .slice(0, 5),
+          byVerdict: {
+            act: allOpportunities.filter((o) => o.verdict === "act").length,
+            watch: allOpportunities.filter((o) => o.verdict === "watch").length,
+            skip: allOpportunities.filter((o) => o.verdict === "skip").length,
+          },
+          topOpportunities: ranked.slice(0, 5),
         };
         result = JSON.stringify(report, null, 2);
       } else {

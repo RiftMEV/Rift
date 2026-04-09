@@ -13,10 +13,11 @@ export function printOpportunity(opp: MEVOpportunity): void {
   const line = "─".repeat(60);
   console.log(`\n${line}`);
   console.log(`  TYPE       ${opp.type.toUpperCase().replace(/_/g, " ")}`);
+  console.log(`  VERDICT    ${opp.verdict.toUpperCase()}`);
   console.log(`  ID         ${opp.id}`);
 
   if (opp.path) {
-    console.log(`  ROUTE      ${opp.path.tokenIn} → ${opp.path.dexA} → ${opp.path.tokenOut} → ${opp.path.dexB}`);
+    console.log(`  ROUTE      ${opp.path.tokenIn} -> ${opp.path.dexA} -> ${opp.path.tokenOut} -> ${opp.path.dexB}`);
     console.log(`  SPREAD     ${opp.path.spreadPct.toFixed(3)}%`);
   }
 
@@ -29,8 +30,8 @@ export function printOpportunity(opp: MEVOpportunity): void {
 }
 
 export function printScanSummary(opps: MEVOpportunity[], elapsedMs: number): void {
-  const totalProfit = opps.reduce((s, o) => s + o.netProfitUsd, 0);
-  console.log(`\n  Scan complete — ${opps.length} opportunit${opps.length === 1 ? "y" : "ies"} found in ${elapsedMs}ms`);
+  const totalProfit = opps.reduce((sum, opp) => sum + opp.netProfitUsd, 0);
+  console.log(`\n  Scan complete - ${opps.length} opportunit${opps.length === 1 ? "y" : "ies"} found in ${elapsedMs}ms`);
   if (opps.length > 0) {
     console.log(`  Total potential profit: ${formatUsd(totalProfit)}`);
   }

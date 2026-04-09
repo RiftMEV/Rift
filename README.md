@@ -3,7 +3,7 @@
 # Rift
 
 **MEV opportunity radar for Solana.**
-Rift watches cross-DEX spreads and distressed credit events, then filters them down to the opportunities that still look viable after execution friction and timing risk.
+Rift watches Jupiter route dislocations and distressed credit events, then filters them down to the opportunities that still look viable after execution friction and timing risk.
 
 [![Build](https://img.shields.io/github/actions/workflow/status/RiftMEV/Rift/ci.yml?branch=master&style=flat-square&label=Build)](https://github.com/RiftMEV/Rift/actions)
 ![License](https://img.shields.io/badge/license-MIT-blue?style=flat-square)
@@ -48,7 +48,7 @@ Rift is built around that more honest version of the problem. It is not trying t
 
 ## At a Glance
 
-- `Use case`: scanning visible Solana MEV surfaces for cross-DEX arbitrage and distressed-account follow-through
+- `Use case`: scanning visible Solana MEV surfaces for Jupiter route dislocations and distressed-account follow-through
 - `Primary input`: DEX route pricing, liquidation state, estimated net edge, and viability analysis
 - `Primary failure mode`: promoting optical spreads that disappear once execution cost is counted
 - `Best for`: operators who want a ranked board of opportunities instead of raw route snapshots
@@ -57,7 +57,7 @@ Rift is built around that more honest version of the problem. It is not trying t
 
 | Class | What Rift is looking for | Why it matters |
 |-------|--------------------------|----------------|
-| `cross_dex_arb` | the same asset priced differently across routeable venues | visible directional spread that may still be extractable |
+| `route_dislocation` | a USDC round-trip on Jupiter returns more than it should after route friction | visible route imbalance that may still be extractable |
 | `liquidation_follow_through` | distressed accounts where the liquidation state creates secondary opportunity | edge tied to credit stress rather than pure spot routing |
 | `fast window` | short-lived route or market dislocation that needs immediate ranking | useful because it decays quickly |
 
@@ -80,11 +80,12 @@ This makes the board more believable to normal readers too. A scanner that shows
 
 Rift follows a simple but strict sequence:
 
-1. scan routeable market surfaces for price dislocation
+1. scan routeable market surfaces for route dislocation
 2. scan monitored credit surfaces for liquidation-linked setups
 3. estimate gross and net edge after known friction
-4. run the best candidates through the decision layer
-5. print a ranked board with action language like `act`, `watch`, or `skip`
+4. assign a deterministic scanner verdict of `act`, `watch`, or `skip`
+5. run the best candidates through the decision layer
+6. print a ranked board with the scanner verdict and the review note side by side
 
 That last step matters. The repo is not strongest when it says "something might exist." It is strongest when it says which setup deserves attention first and why.
 
@@ -104,7 +105,7 @@ In other words, the math should still hold after the market is treated like a ma
 ```text
 RIFT // OPPORTUNITY BOARD
 
-type              cross_dex_arb
+type              route_dislocation
 pair              SOL/USDC
 gross spread      0.62%
 net edge          0.31%
@@ -140,7 +141,7 @@ That combination makes the README much stronger for launch because the product v
 ## Risk Controls
 
 - `net-edge filter`: downgrades spreads that fail after cost
-- `viability review`: forces a second pass before an opportunity is treated as actionable
+- `viability review`: runs a second pass over the same seeded opportunity set before an opportunity is treated as actionable
 - `opportunity ranking`: prevents the board from collapsing into a flood of equal-looking hits
 - `surface limits`: keeps the scanner focused on visible, repeatable MEV categories rather than pretending to cover every private edge
 

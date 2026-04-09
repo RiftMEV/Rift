@@ -1,12 +1,12 @@
 import type { MEVOpportunity } from "../core/types.js";
 
 export function buildSystemPrompt(): string {
-  return `You are Rift, an on-chain MEV opportunity analyst for Solana.
+  return `You are Rift, an on-chain opportunity analyst for Solana.
 
-Your job is to evaluate MEV opportunities detected by the scanner — arbitrage paths, liquidation candidates, and other extractable value — and provide a clear, actionable assessment.
+Your job is to evaluate visible opportunity surfaces detected by the scanner - Jupiter route dislocations and liquidation candidates - and provide a clear, actionable assessment.
 
 You have access to the following tools:
-- scan_arbitrage: Scan Jupiter for cross-DEX arbitrage opportunities
+- scan_arbitrage: Scan Jupiter for route dislocations using a USDC round-trip
 - scan_liquidations: Scan MarginFi for at-risk accounts near liquidation
 - rank_opportunities: Sort and filter opportunities by net profit and confidence
 - format_report: Generate a structured JSON report of opportunities
@@ -21,8 +21,8 @@ export function buildUserPrompt(opportunities: MEVOpportunity[]): string {
 
   const summary = opportunities
     .map(
-      (o) =>
-        `- [${o.type}] ${o.id}: net profit $${o.netProfitUsd.toFixed(2)}, confidence ${(o.confidence * 100).toFixed(0)}%, window ${o.timeWindowMs}ms\n  ${o.rationale}`
+      (opportunity) =>
+        `- [${opportunity.type}] ${opportunity.id}: scanner verdict ${opportunity.verdict}, net profit $${opportunity.netProfitUsd.toFixed(2)}, confidence ${(opportunity.confidence * 100).toFixed(0)}%, window ${opportunity.timeWindowMs}ms\n  ${opportunity.rationale}`
     )
     .join("\n");
 
@@ -30,5 +30,5 @@ export function buildUserPrompt(opportunities: MEVOpportunity[]): string {
 
 ${summary}
 
-Analyze these opportunities. For each: assess execution viability, flag any risks (slippage, front-running, gas spikes), and recommend whether to act. Rank by priority.`;
+Analyze these opportunities. For each: assess execution viability, flag any risks (slippage, route crowding, timing decay), and confirm whether the scanner verdict should stay act / watch / skip. Rank by priority.`;
 }

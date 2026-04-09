@@ -13,8 +13,6 @@ jobs:
     env:
       CI: true
       ANTHROPIC_API_KEY: test-anthropic-key
-      HELIUS_API_KEY: test-helius-key
-      SOLANA_RPC_URL: https://example.com
       WALLET_ADDRESS: 11111111111111111111111111111111
       WALLET_PRIVATE_KEY: test-private-key
       TWITTER_BEARER_TOKEN: test-twitter-bearer
