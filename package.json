@@ -1,7 +1,7 @@
 {
   "name": "rift",
   "version": "1.0.0",
-  "description": "On-chain MEV opportunity scanner for Solana.",
+  "description": "Solana route-dislocation and liquidation opportunity radar.",
   "license": "MIT",
   "repository": {
     "type": "git",
