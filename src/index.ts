@@ -10,13 +10,15 @@ async function main(): Promise<void> {
   const config = loadConfig();
   setLogLevel(config.LOG_LEVEL);
   let inFlight = false;
+  let skippedScans = 0;
 
   logger.info("Rift MEV Scanner starting...");
   logger.info(`Min profit: $${config.MIN_PROFIT_USD} | Min confidence: ${config.MIN_CONFIDENCE}`);
 
   async function scan(): Promise<void> {
     if (inFlight) {
-      logger.warn("Skipping scan because the previous cycle is still running");
+      skippedScans++;
+      logger.warn("Skipping scan because the previous cycle is still running", { skippedScans });
       return;
     }
 
@@ -24,10 +26,25 @@ async function main(): Promise<void> {
     const start = Date.now();
 
     try {
-      const [arbOpps, liqOpps] = await Promise.all([
+      const [arbResult, liqResult] = await Promise.allSettled([
         scanArbitrageOpportunities(config),
         scanLiquidationOpportunities(config),
       ]);
+
+      const arbOpps = arbResult.status === "fulfilled" ? arbResult.value : [];
+      const liqOpps = liqResult.status === "fulfilled" ? liqResult.value : [];
+
+      if (arbResult.status === "rejected") {
+        logger.error("Arbitrage scan failed", {
+          error: arbResult.reason instanceof Error ? arbResult.reason.message : String(arbResult.reason),
+        });
+      }
+
+      if (liqResult.status === "rejected") {
+        logger.error("Liquidation scan failed", {
+          error: liqResult.reason instanceof Error ? liqResult.reason.message : String(liqResult.reason),
+        });
+      }
 
       const all = [...arbOpps, ...liqOpps].sort((a, b) => b.netProfitUsd - a.netProfitUsd);
 
@@ -35,11 +52,24 @@ async function main(): Promise<void> {
         printOpportunity(opp);
       }
 
-      printScanSummary(all, Date.now() - start);
+      const durationMs = Date.now() - start;
+      printScanSummary(all, durationMs);
 
-      if (all.length > 0) {
-        await runAgentLoop(config, all);
+      if (durationMs > config.SCAN_INTERVAL_MS) {
+        logger.warn("Rift scan exceeded configured interval", {
+          durationMs,
+          intervalMs: config.SCAN_INTERVAL_MS,
+        });
       }
+
+      if (all.length === 0) {
+        logger.info("No route-dislocation opportunities met the profit threshold this cycle");
+        return;
+      }
+
+      await runAgentLoop(config, all);
+    } catch (err) {
+      logger.error("Scan error:", err);
     } finally {
       inFlight = false;
     }
@@ -47,7 +77,9 @@ async function main(): Promise<void> {
 
   await scan();
 
-  setInterval(scan, config.SCAN_INTERVAL_MS);
+  setInterval(() => {
+    void scan();
+  }, config.SCAN_INTERVAL_MS);
   logger.info(`Scanning every ${config.SCAN_INTERVAL_MS}ms...`);
 }
 
