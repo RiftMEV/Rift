@@ -1,5 +1,22 @@
 import { describe, it, expect } from "vitest";
+import { rankOpportunities } from "../src/scanner/arbitrage.js";
 import type { MEVOpportunity, ArbPath } from "../src/core/types.js";
+
+
+function makeOpportunity(id: string, netProfitUsd: number): MEVOpportunity {
+  return {
+    id,
+    type: "arbitrage",
+    verdict: "watch",
+    estimatedProfitUsd: netProfitUsd + 10,
+    gasEstimateUsd: 10,
+    netProfitUsd,
+    confidence: 0.8,
+    timeWindowMs: 1500,
+    rationale: "Test opportunity",
+    detectedAt: Date.now(),
+  };
+}
 
 describe("Rift opportunity models", () => {
   it("builds a valid route-dislocation opportunity", () => {
@@ -53,6 +70,12 @@ describe("Rift opportunity models", () => {
     expect(opp.type).toBe("liquidation_arb");
     expect(opp.path).toBeUndefined();
     expect(opp.confidence).toBeGreaterThanOrEqual(0.9);
+  });
+
+  it("ranks opportunities by net profit", () => {
+    const low = makeOpportunity("low", 25);
+    const high = makeOpportunity("high", 90);
+    expect(rankOpportunities([low, high]).map((opp) => opp.id)).toEqual(["high", "low"]);
   });
 
   it("net profit is estimated minus gas", () => {

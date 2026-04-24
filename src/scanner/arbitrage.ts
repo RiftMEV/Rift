@@ -54,6 +54,10 @@ function dominantVenue(quote: JupiterQuote): string {
   return quote.routePlan[0]?.swapInfo?.label ?? "Unknown route";
 }
 
+export function rankOpportunities(opportunities: MEVOpportunity[]): MEVOpportunity[] {
+  return [...opportunities].sort((left, right) => right.netProfitUsd - left.netProfitUsd);
+}
+
 function classifyVerdict(
   config: Config,
   netProfitUsd: number,
@@ -149,5 +153,5 @@ export async function scanArbitrageOpportunities(
     }
   }
 
-  return opportunities;
+  return rankOpportunities(opportunities);
 }
