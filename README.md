@@ -23,15 +23,7 @@ It watches route-dislocation and liquidation surfaces, estimates whether the mat
 
 ---
 
-Arbitrage Path • Opportunity Scanner • Why Rift Exists • At a Glance • Opportunity Classes • How Rift Filters Noise • Scanner Loop • Example Output • Execution Reality • Risk Controls • Quick Start
-
-## Arbitrage Path
-
-![Rift Paths](assets/preview-paths.svg)
-
-## Opportunity Scanner
-
-![Rift Scanner](assets/preview-scanner.svg)
+Why Rift Exists • At a Glance • Opportunity Classes • How Rift Filters Noise • Scanner Loop • Example Output • Execution Reality • Risk Controls • Quick Start
 
 ## Why Rift Exists
 
